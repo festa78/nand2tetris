@@ -28,6 +28,7 @@ class Parser:
         'if-goto': COMMAND_TYPES[5],
         'function': COMMAND_TYPES[6],
         'return': COMMAND_TYPES[7],
+        'call': COMMAND_TYPES[8],
     }
 
     def __init__(self, vmpath):

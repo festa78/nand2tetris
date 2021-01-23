@@ -43,13 +43,20 @@ class CodeWriter:
         'not': '!',
     }
 
-    def __init__(self, outFilePath):
+    def __init__(self, outFilePath, do_bootstrap):
         assert outFilePath.endswith('.asm'), 'Specify .asm file path'
         self.outFileStream = open(outFilePath, 'w')
         self.vmParser = None
 
         # Postfix ID to avoid duplicate label.
         self.label_count = 0
+
+        if do_bootstrap:
+            self.outFileStream.write('@256\n')
+            self.outFileStream.write('D=A\n')
+            self.outFileStream.write('@SP\n')
+            self.outFileStream.write('M=D\n')
+            self.writeCall('Sys.init', 0)
 
     def setFileName(self, vmFileName):
         self.vmFileName = vmFileName
@@ -74,7 +81,54 @@ class CodeWriter:
         self.outFileStream.write('@{}\n'.format(label))
         self.outFileStream.write('D;JNE\n')
 
+    def writeCall(self, functionName, numArgs):
+        self.outFileStream.write('// call {} {}\n'.format(
+            functionName, numArgs))
+
+        return_addr_name = 'return-address-{}'.format(self.label_count)
+        self.label_count += 1
+
+        # Push the current addresses.
+        for addr_name in (return_addr_name, 'LCL', 'ARG', 'THIS', 'THAT'):
+            self.outFileStream.write('// Push the address {}\n'.format(
+                addr_name))
+            self.outFileStream.write('@{}\n'.format(addr_name))
+
+            if addr_name == return_addr_name:
+                self.outFileStream.write('D=A\n')
+            else:
+                self.outFileStream.write('D=M\n')
+
+            # Push.
+            self.outFileStream.write('@SP\n')
+            self.outFileStream.write('A=M\n')
+            self.outFileStream.write('M=D\n')
+            # Increment SP.
+            self.outFileStream.write('@SP\n')
+            self.outFileStream.write('M=M+1\n')
+
+        # ARG = SP - n - 5.
+        self.outFileStream.write('// Set ARG {}\n'.format(
+            addr_name))
+        self.outFileStream.write('@{}\n'.format(numArgs + 5))
+        self.outFileStream.write('D=A\n')
+        self.outFileStream.write('@SP\n')
+        self.outFileStream.write('D=M-D\n')
+        self.outFileStream.write('@ARG\n')
+        self.outFileStream.write('M=D\n')
+
+        self.outFileStream.write('@SP\n')
+        self.outFileStream.write('D=M\n')
+        self.outFileStream.write('@LCL\n')
+        self.outFileStream.write('M=D\n')
+
+        self.writeGoto(functionName)
+        self.writeLabel(return_addr_name)
+
     def writeFunction(self, functionName, numLocals):
+        self.outFileStream.write('// function {} {}\n'.format(
+            functionName, numLocals))
+            
         self.writeLabel(functionName)
 
         # Initialize local variables and move SP.
@@ -89,12 +143,34 @@ class CodeWriter:
             self.outFileStream.write('M=M+1\n')
 
     def writeReturn(self):
+        self.outFileStream.write('// return\n')
+
+        # Set a temporary variable FRAME to store LCL address.
+        frame_name = 'FRAME-{}'.format(self.label_count)
+        self.label_count += 1
+        self.outFileStream.write('@LCL\n')
+        self.outFileStream.write('D=M\n')
+        self.outFileStream.write('@{}\n'.format(frame_name))
+        self.outFileStream.write('M=D\n')
+
+        # Set a temporary variable RET to store return address.
+        # Need it to store before overwritten when there is no arguments.
+        return_name = 'RET-{}'.format(self.label_count)
+        self.label_count += 1
+        self.outFileStream.write('@5\n')
+        self.outFileStream.write('D=A\n')
+        self.outFileStream.write('@{}\n'.format(frame_name))
+        self.outFileStream.write('A=M-D\n')
+        self.outFileStream.write('D=M\n')
+        self.outFileStream.write('@{}\n'.format(return_name))
+        self.outFileStream.write('M=D\n')
+
         # Set the return value to ARG, where SP should resume back to.
         # Decrement SP.
         self.outFileStream.write('@SP\n')
         self.outFileStream.write('M=M-1\n')
         # Pop.
-        self.outFileStream.write('@SP\n')
+        self.outFileStream.write('@SP\n')  # TODO: Remove and A=M-1
         self.outFileStream.write('A=M\n')
         self.outFileStream.write('D=M\n')
         # Set to ARG.
@@ -111,48 +187,17 @@ class CodeWriter:
         self.outFileStream.write('@SP\n')
         self.outFileStream.write('M=M+1\n')
 
-        # Set a temporary variable FRAME to store LCL address.
-        self.outFileStream.write('@LCL\n')
-        self.outFileStream.write('D=M\n')
-        self.outFileStream.write('@FRAME\n')
-        self.outFileStream.write('M=D\n')
-
         # Resume other addresses.
-        # THAT.
-        self.outFileStream.write('@FRAME\n')
-        self.outFileStream.write('M=M-1\n')
-        self.outFileStream.write('A=M\n')
-        self.outFileStream.write('D=M\n')
-        self.outFileStream.write('@THAT\n')
-        self.outFileStream.write('M=D\n')
-        # THIS.
-        self.outFileStream.write('@FRAME\n')
-        self.outFileStream.write('M=M-1\n')
-        self.outFileStream.write('A=M\n')
-        self.outFileStream.write('D=M\n')
-        self.outFileStream.write('@THIS\n')
-        self.outFileStream.write('M=D\n')
-        # ARG.
-        self.outFileStream.write('@FRAME\n')
-        self.outFileStream.write('M=M-1\n')
-        self.outFileStream.write('A=M\n')
-        self.outFileStream.write('D=M\n')
-        self.outFileStream.write('@ARG\n')
-        self.outFileStream.write('M=D\n')
-        # LCL.
-        self.outFileStream.write('@FRAME\n')
-        self.outFileStream.write('M=M-1\n')
-        self.outFileStream.write('A=M\n')
-        self.outFileStream.write('D=M\n')
-        self.outFileStream.write('@LCL\n')
-        self.outFileStream.write('M=D\n')
+        for addr_name in ('THAT', 'THIS', 'ARG', 'LCL'):
+            self.outFileStream.write('@{}\n'.format(frame_name))
+            self.outFileStream.write('M=M-1\n')  # TODO: A=M-1
+            self.outFileStream.write('A=M\n')
+            self.outFileStream.write('D=M\n')
+            self.outFileStream.write('@{}\n'.format(addr_name))
+            self.outFileStream.write('M=D\n')
 
-        # Get return address and do go-to.
-        self.outFileStream.write('@FRAME\n')
-        self.outFileStream.write('M=M-1\n')
-        # Set an address where it points return address.
-        self.outFileStream.write('A=M\n')
-        # Set return address to A.
+        # Go back to the return address.
+        self.outFileStream.write('@{}\n'.format(return_name))
         self.outFileStream.write('A=M\n')
         self.outFileStream.write('0;JMP\n')
 
@@ -272,14 +317,14 @@ class CodeWriter:
             elif segment in ('temp', 'pointer'):
                 self.outFileStream.write('@{}\n'.format(
                     self.SEGMENT_NAME_TO_SYMBOL[segment]))
-                for _ in range(int(index)):
+                for _ in range(int(index)):  # TODO
                     self.outFileStream.write('A=A+1\n')
                 self.outFileStream.write('D=M\n')
             elif segment in self.SEGMENT_NAME_TO_SYMBOL.keys():
                 self.outFileStream.write('@{}\n'.format(
                     self.SEGMENT_NAME_TO_SYMBOL[segment]))
                 self.outFileStream.write('A=M\n')
-                for _ in range(int(index)):
+                for _ in range(int(index)):  # TODO
                     self.outFileStream.write('A=A+1\n')
                 self.outFileStream.write('D=M\n')
             else:
@@ -308,7 +353,7 @@ class CodeWriter:
             if segment in ('temp', 'pointer'):
                 self.outFileStream.write('@{}\n'.format(
                     self.SEGMENT_NAME_TO_SYMBOL[segment]))
-                for _ in range(int(index)):
+                for _ in range(int(index)):  # TODO
                     self.outFileStream.write('A=A+1\n')
                 self.outFileStream.write('M=D\n')
             elif segment == 'static':
@@ -319,7 +364,7 @@ class CodeWriter:
                 self.outFileStream.write('@{}\n'.format(
                     self.SEGMENT_NAME_TO_SYMBOL[segment]))
                 self.outFileStream.write('A=M\n')
-                for _ in range(int(index)):
+                for _ in range(int(index)):  # TODO
                     self.outFileStream.write('A=A+1\n')
                 self.outFileStream.write('M=D\n')
             else:

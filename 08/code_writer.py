@@ -74,6 +74,87 @@ class CodeWriter:
         self.outFileStream.write('@{}\n'.format(label))
         self.outFileStream.write('D;JNE\n')
 
+    def writeFunction(self, functionName, numLocals):
+        self.writeLabel(functionName)
+
+        # Initialize local variables and move SP.
+        # Currently LCL == SP.
+        for _ in range(numLocals):
+            # Initialize to zero.
+            self.outFileStream.write('@SP\n')
+            self.outFileStream.write('A=M\n')
+            self.outFileStream.write('M=0\n')
+            # Increment SP.
+            self.outFileStream.write('@SP\n')
+            self.outFileStream.write('M=M+1\n')
+
+    def writeReturn(self):
+        # Set the return value to ARG, where SP should resume back to.
+        # Decrement SP.
+        self.outFileStream.write('@SP\n')
+        self.outFileStream.write('M=M-1\n')
+        # Pop.
+        self.outFileStream.write('@SP\n')
+        self.outFileStream.write('A=M\n')
+        self.outFileStream.write('D=M\n')
+        # Set to ARG.
+        self.outFileStream.write('@ARG\n')
+        self.outFileStream.write('A=M\n')
+        self.outFileStream.write('M=D\n')
+
+        # Resume SP address.
+        self.outFileStream.write('@ARG\n')
+        self.outFileStream.write('D=M\n')
+        self.outFileStream.write('@SP\n')
+        self.outFileStream.write('M=D\n')
+        # Increment SP to take into account the pushed return value.
+        self.outFileStream.write('@SP\n')
+        self.outFileStream.write('M=M+1\n')
+
+        # Set a temporary variable FRAME to store LCL address.
+        self.outFileStream.write('@LCL\n')
+        self.outFileStream.write('D=M\n')
+        self.outFileStream.write('@FRAME\n')
+        self.outFileStream.write('M=D\n')
+
+        # Resume other addresses.
+        # THAT.
+        self.outFileStream.write('@FRAME\n')
+        self.outFileStream.write('M=M-1\n')
+        self.outFileStream.write('A=M\n')
+        self.outFileStream.write('D=M\n')
+        self.outFileStream.write('@THAT\n')
+        self.outFileStream.write('M=D\n')
+        # THIS.
+        self.outFileStream.write('@FRAME\n')
+        self.outFileStream.write('M=M-1\n')
+        self.outFileStream.write('A=M\n')
+        self.outFileStream.write('D=M\n')
+        self.outFileStream.write('@THIS\n')
+        self.outFileStream.write('M=D\n')
+        # ARG.
+        self.outFileStream.write('@FRAME\n')
+        self.outFileStream.write('M=M-1\n')
+        self.outFileStream.write('A=M\n')
+        self.outFileStream.write('D=M\n')
+        self.outFileStream.write('@ARG\n')
+        self.outFileStream.write('M=D\n')
+        # LCL.
+        self.outFileStream.write('@FRAME\n')
+        self.outFileStream.write('M=M-1\n')
+        self.outFileStream.write('A=M\n')
+        self.outFileStream.write('D=M\n')
+        self.outFileStream.write('@LCL\n')
+        self.outFileStream.write('M=D\n')
+
+        # Get return address and do go-to.
+        self.outFileStream.write('@FRAME\n')
+        self.outFileStream.write('M=M-1\n')
+        # Set an address where it points return address.
+        self.outFileStream.write('A=M\n')
+        # Set return address to A.
+        self.outFileStream.write('A=M\n')
+        self.outFileStream.write('0;JMP\n')
 
     def writeArithmetic(self, command):
         """command is actual arithmetic command.

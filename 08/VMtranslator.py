@@ -51,6 +51,17 @@ if __name__ == '__main__':
                 ), 'label name should not start from a digit.'
 
             codeWriter.writeIf(label)
+        elif command_type in codeWriter.vmParser.COMMAND_TYPES[6]:
+            # C_FUNCTION.
+            functionName = codeWriter.vmParser.arg1()
+            numLocals = codeWriter.vmParser.arg2()
+            assert numLocals.isdigit(
+                ), 'numLocals should be a digit.'
+
+            codeWriter.writeFunction(functionName, int(numLocals))
+        elif command_type in codeWriter.vmParser.COMMAND_TYPES[7]:
+            # C_RETURN.
+            codeWriter.writeReturn()
         else:
             AttributeError('Unsupported command type')
 

@@ -3,6 +3,5 @@ cc_binary(
     srcs = ["main.cpp"],
     deps = [
         "//lib:JackAnalyzer",
-        "//lib:JackTokenizer",
     ],
 )

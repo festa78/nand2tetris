@@ -1,5 +1,5 @@
 // No copyright.
-// Jack code compiler engine.
+// Jack code analyzer.
 
 #ifndef LIB_JACKANALYZER_HPP_
 #define LIB_JACKANALYZER_HPP_
@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+#include "CompilationEngine.hpp"
 #include "JackTokenizer.hpp"
 
 class JackAnalyzer {
@@ -15,9 +16,11 @@ class JackAnalyzer {
                         const std::string& output_filename);
   ~JackAnalyzer() = default;
 
+  void compileToXML();
+
  private:
-  std::unique_ptr<JackTokenizer> tokenizer_;
-  // std::unique_ptr<CompilationEngine> compilation_engine_;
+  const std::string source_;
+  const std::string output_filename_;
 };
 
 #endif  // LIB_JACKANALYZER_HPP_

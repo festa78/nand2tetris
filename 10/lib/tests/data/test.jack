@@ -1,4 +1,6 @@
 // dummy comment.
+/* dummy comment2 */
+/** dummy comment3 */
 class Main {
 
     function void main() {
